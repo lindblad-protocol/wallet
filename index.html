@@ -612,13 +612,7 @@ body {
       <span id="mainBalanceNum" style="color:#ffffff">—</span><span id="mainBalanceSym"> PYCO</span>
     </div>
     <div class="wallet-node" id="myNodeLabel">Connect a node to see your balance</div>
-    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2)">
-      <div style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px">Device PUF</div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <div style="font-family:var(--mono);font-size:11px;color:var(--muted2)" id="devicePufDisplay">Extracting...</div>
-        <button onclick="copyPuf('device')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 4px" title="Copy PUF">⎘</button>
-      </div>
-    </div>
+
     <div class="wallet-assets">
       <div class="asset-chip active" onclick="selectAsset('PYCO')" id="chip-pyco" style="cursor:pointer">
         <span>⬡</span>
@@ -755,7 +749,7 @@ body {
     <button class="tab active" id="tab-net" onclick="showTab('net')">My Node</button>
     <button class="tab" id="tab-tokens" onclick="showTab('tokens')">Tokens</button>
     <button class="tab" id="tab-bridge" onclick="showTab('bridge')">Bridge</button>
-    <button class="tab" id="tab-chain" onclick="showTab('chain')">Blocks</button>
+    <button class="tab" id="tab-chain" onclick="showTab('chain')">Activity</button>
   </div>
 
   <!-- NETWORK TAB -->
@@ -1386,7 +1380,7 @@ async function loadLDBalance() {
     }
     pycoAmt.textContent = pycoBalance.toFixed(4);
     const shortAddr = 'LD' + S.devicePuf.slice(0,7).toUpperCase();
-    lbl.innerHTML = '<span style="cursor:pointer;color:var(--muted2);font-size:11px" onclick="copyAddress()" title="Tap to copy">' + shortAddr + ' ⎘</span>';
+    lbl.innerHTML = '<span style="cursor:pointer;color:var(--neon);font-family:var(--mono);font-size:12px;letter-spacing:1px" onclick="copyAddress()" title="Tap to copy">' + shortAddr + ' (ready) ⎘</span>';
   } catch(e) {
     document.getElementById('mainBalanceNum').textContent = '—'; document.getElementById('mainBalanceSym').textContent = ' PYCO';
     const shortAddr2 = 'LD' + S.devicePuf.slice(0,7).toUpperCase();
@@ -1429,13 +1423,12 @@ function updateWalletView() {
 
   document.getElementById('mainBalanceNum').textContent = fmtFull(balance); document.getElementById('mainBalanceSym').textContent = ' PYCO'; S.ldBalance = balance;
   const nodeShortId = node.id.startsWith('LD') ? node.id : ('LD' + (node.puf||'').slice(0,7).toUpperCase());
-  const nodePufShort = (node.puf || '').slice(0,8);
+  lbl.innerHTML = '';
   const nodeSpan = document.createElement('span');
-  nodeSpan.style.cursor = 'pointer';
+  nodeSpan.style.cssText = 'cursor:pointer;color:var(--neon);font-family:var(--mono);font-size:12px;letter-spacing:1px';
   nodeSpan.title = 'Copy node ID';
   nodeSpan.textContent = nodeShortId + ' ⎘';
   nodeSpan.onclick = () => navigator.clipboard.writeText(nodeShortId).then(() => toast('Copied!','ok'));
-  lbl.textContent = 'PUF: ' + nodePufShort + '...  |  ';
   lbl.appendChild(nodeSpan);
   pycoAmt.textContent = fmtFull(balance);
   btn.disabled = false;  // Send available for all users
@@ -1794,26 +1787,73 @@ function renderNodesTab() {
 
 // ── CHAIN TAB ──
 async function renderChainTab() {
+  renderActivityTab();
+}
+
+async function renderActivityTab() {
   const el = document.getElementById('chainList');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-family:var(--mono);font-size:11px">Loading...</div>';
+
   try {
-    const data = await fetch(`${VPS}/blocks?limit=3`).then(r => r.json());
-    const blocks = (data.blocks || []).reverse();
-    if (!blocks.length) { el.innerHTML = '<div class="loading">No blocks yet</div>'; return; }
-    el.innerHTML = blocks.map(b => `
-      <div class="block-card">
-        <div class="block-ep">Epoch #${b.ep} — ${b.nodes} nodes — ${b.txs?.length||0} txs</div>
-        <div class="block-hash">
-          prev: ${b.prev?.toUpperCase()||'—'} → <span>${b.curr?.toUpperCase()||'—'}</span><br>
-          mined: ${fmtFull(b.mined/1e6)} PYCO
+    const ldAddr = 'LD-' + S.devicePuf;
+    const res = await fetch(`${VPS}/activity?address=${ldAddr}&limit=20`);
+    const data = await res.json();
+    const txs = data.transactions || [];
+
+    if (txs.length === 0) {
+      el.innerHTML = '<div style="text-align:center;padding:32px 20px;color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:1px">NO ACTIVITY YET</div>';
+      return;
+    }
+
+    el.innerHTML = txs.map(tx => {
+      const isSend = tx.from_addr === ldAddr;
+      const isReceive = tx.to_addr === ldAddr;
+      const isDeposit = tx.type === 'BRIDGE_DEPOSIT';
+      const isWithdraw = tx.type === 'BRIDGE_WITHDRAW';
+
+      let icon, label, color, counterpart;
+      if (isDeposit) {
+        icon = '⬇'; label = 'Deposit'; color = '#00bfff';
+        counterpart = 'Arbitrum';
+      } else if (isWithdraw) {
+        icon = '⬆'; label = 'Withdraw'; color = '#f5a623';
+        counterpart = 'Arbitrum';
+      } else if (isSend) {
+        icon = '↑'; label = 'Send'; color = '#f87171';
+        counterpart = (tx.to_addr || '').replace('LD-','').slice(0,4).toUpperCase();
+        counterpart = 'LD' + (tx.to_addr || '').replace('LD-','').slice(0,7).toUpperCase();
+      } else {
+        icon = '↓'; label = 'Receive'; color = '#00ff88';
+        counterpart = 'LD' + (tx.from_addr || '').replace('LD-','').slice(0,7).toUpperCase();
+      }
+
+      const amount = ((tx.amount || 0) / 1e6).toFixed(2);
+      const token = tx.token || 'PYCO';
+      const ts = tx.ts ? new Date(tx.ts * 1000) : null;
+      const dateStr = ts ? ts.toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}) : '—';
+      const timeStr = ts ? ts.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}) : '';
+
+      return `<div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid rgba(0,191,255,0.06);">
+        <div style="width:32px;height:32px;border-radius:50%;background:rgba(0,191,255,0.08);border:1px solid rgba(0,191,255,0.15);display:flex;align-items:center;justify-content:center;font-size:14px;color:${color};flex-shrink:0">${icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+            <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text)">${label}</div>
+            <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:${color}">${isSend || isWithdraw ? '-' : '+'}${amount} ${token}</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-family:var(--mono);font-size:10px;color:var(--muted)">${counterpart}</div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">${dateStr} ${timeStr}</div>
+          </div>
         </div>
-      </div>`).join('') +
-      `<div style="text-align:center;padding:12px 0;font-family:var(--mono);font-size:11px;color:var(--muted2)">
-        Full history → <a href="/scan" style="color:var(--neon);text-decoration:none">lindblad.io/scan</a>
       </div>`;
+    }).join('');
+
   } catch(e) {
-    el.innerHTML = '<div class="loading">Error loading blocks</div>';
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-family:var(--mono);font-size:11px">Unable to load activity</div>';
   }
 }
+
 
 // ── REFRESH ──
 function doRefresh() { refresh(); toast('Refreshed', 'ok'); }
@@ -1971,6 +2011,12 @@ async function selectAccount(idx) {
     if (btn) btn.disabled = false;
     const btnR = document.getElementById('btnReceive');
     if (btnR) btnR.disabled = false;
+    // Update label to show device ID
+    const lbl2 = document.getElementById('myNodeLabel');
+    if (lbl2 && S.devicePuf) {
+      const shortAddr = 'LD' + S.devicePuf.slice(0,7).toUpperCase();
+      lbl2.innerHTML = '<span style="cursor:pointer;color:var(--neon);font-family:var(--mono);font-size:12px;letter-spacing:1px" onclick="copyAddress()" title="Tap to copy">' + shortAddr + ' (ready) ⎘</span>';
+    }
     toast('Using: MY DEVICE', 'ok');
   }
 
@@ -2122,11 +2168,14 @@ function showNotAuthorized(nodeId) {
 // ── COPY ──
 function copyPuf(type) {
   let text = '';
-  if (type === 'device') text = S.devicePuf || '';
-  else if (type === 'node') text = S.connectedNode?.puf || '';
-  if (!text) return;
+  if (type === 'device') text = 'LD' + (S.devicePuf || '').slice(0,7).toUpperCase();
+  else if (type === 'node') {
+    const puf = S.connectedNode?.puf || '';
+    text = 'LD' + puf.slice(0,7).toUpperCase();
+  }
+  if (!text || text === 'LD') return;
   navigator.clipboard.writeText(text).then(() => {
-    toast('Copied: ' + text.slice(0,8) + '...', 'ok');
+    toast('Copied: ' + text, 'ok');
   }).catch(() => {
     // Fallback for older browsers
     const el = document.createElement('textarea');
@@ -2250,12 +2299,12 @@ async function getMyLDBalance() {
 }
 
 function copyAddress() {
-  const addr = 'LD-' + (S.devicePuf || '');
-  navigator.clipboard.writeText(addr).then(() => {
-    toast('Copied: ' + addr.slice(0,14) + '...', 'ok');
+  const shortId = 'LD' + (S.devicePuf || '').slice(0,7).toUpperCase();
+  navigator.clipboard.writeText(shortId).then(() => {
+    toast('Copied: ' + shortId, 'ok');
   }).catch(() => {
     const el = document.createElement('textarea');
-    el.value = addr; document.body.appendChild(el);
+    el.value = shortId; document.body.appendChild(el);
     el.select(); document.execCommand('copy');
     document.body.removeChild(el);
     toast('Copied!', 'ok');
