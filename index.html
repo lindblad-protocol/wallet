@@ -1210,14 +1210,20 @@ async function refresh() {
     const [chain, block, registry] = await Promise.all([
       fetch(`${VPS}/chain`).then(r => r.json()),
       fetch(`${VPS}/sync`).then(r => r.json()),
-      fetch(`${VPS}/nodes`).then(r => r.json()),
+      fetch(`${VPS}/node-list`).then(r => r.json()),
     ]);
     S.chain = chain;
     S.block = block;
     // Filter active nodes (pushed in last 3 minutes)
     const nowTs = Math.floor(Date.now() / 1000);
-    const activeNodeIds = new Set((registry.nodes||[]).filter(n => nowTs - n.lastSeen < 180).map(n => n.nodeId));
+    const activeNodeIds = new Set((registry.nodes||[]).filter(n => nowTs - n.lastSeen < 180).map(n => n.id || n.nodeId));
     S.nodes = (block?.att || []).filter(n => activeNodeIds.has(n.id));
+    // If block has no attestations, use registry directly
+    if (S.nodes.length === 0 && registry.nodes) {
+      S.nodes = (registry.nodes||[]).filter(n => nowTs - n.lastSeen < 180).map(n => ({
+        id: n.id || n.nodeId, puf: n.puf, bal: 0
+      }));
+    }
     S.epochEnd = block ? (block.ts + 60) * 1000 : null;
 
     updateStats();
@@ -2610,7 +2616,7 @@ async function loadActiveNodes() {
   const sel = document.getElementById('withdrawNode');
   if (!sel) return;
   try {
-    const res = await fetch(`${VPS}/nodes`);
+    const res = await fetch(`${VPS}/node-list`);
     const data = await res.json();
     const now = Math.floor(Date.now()/1000);
     const active = (data.nodes||[]).filter(n => now - n.lastSeen < 180);
