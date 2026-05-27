@@ -2168,14 +2168,18 @@ function showNotAuthorized(nodeId) {
 // ── COPY ──
 function copyPuf(type) {
   let text = '';
-  if (type === 'device') text = 'LD' + (S.devicePuf || '').slice(0,7).toUpperCase();
-  else if (type === 'node') {
+  let display = '';
+  if (type === 'device') {
+    text = 'LD-' + (S.devicePuf || '').toUpperCase();
+    display = 'LD' + (S.devicePuf || '').slice(0,7).toUpperCase();
+  } else if (type === 'node') {
     const puf = S.connectedNode?.puf || '';
-    text = 'LD' + puf.slice(0,7).toUpperCase();
+    text = 'LD-' + puf.toUpperCase();
+    display = 'LD' + puf.slice(0,7).toUpperCase();
   }
-  if (!text || text === 'LD') return;
+  if (!text || text === 'LD-') return;
   navigator.clipboard.writeText(text).then(() => {
-    toast('Copied: ' + text, 'ok');
+    toast('Copied: ' + display, 'ok');
   }).catch(() => {
     // Fallback for older browsers
     const el = document.createElement('textarea');
@@ -2299,12 +2303,14 @@ async function getMyLDBalance() {
 }
 
 function copyAddress() {
+  // Copy full LD- address for sending
+  const fullAddr = 'LD-' + (S.devicePuf || '').toUpperCase();
   const shortId = 'LD' + (S.devicePuf || '').slice(0,7).toUpperCase();
-  navigator.clipboard.writeText(shortId).then(() => {
+  navigator.clipboard.writeText(fullAddr).then(() => {
     toast('Copied: ' + shortId, 'ok');
   }).catch(() => {
     const el = document.createElement('textarea');
-    el.value = shortId; document.body.appendChild(el);
+    el.value = fullAddr; document.body.appendChild(el);
     el.select(); document.execCommand('copy');
     document.body.removeChild(el);
     toast('Copied!', 'ok');
@@ -2799,7 +2805,12 @@ async function sendToken() {
   const token = selectedBridgeToken;
 
   if (!amt || amt <= 0) { msg.textContent = 'Enter amount'; msg.style.color = 'var(--red,#f87171)'; return; }
-  if (!toAddr.startsWith('LD-')) { msg.textContent = 'Enter valid LD- address'; msg.style.color = 'var(--red,#f87171)'; return; }
+  // Accept both formats
+  if (!toAddr.startsWith('LD')) { msg.textContent = 'Enter valid LD address'; msg.style.color = 'var(--red,#f87171)'; return; }
+  // Must be full format LD-XXXXXXXXXXXXXXXX for sending
+  if (!toAddr.startsWith('LD-') || toAddr.length < 10) {
+    msg.textContent = 'Copy recipient full address with ⎘'; msg.style.color = 'var(--red,#f87171)'; return;
+  }
   if (toAddr === ldAddr) { msg.textContent = 'Cannot send to yourself'; msg.style.color = 'var(--red,#f87171)'; return; }
 
   msg.textContent = 'Signing with device...';
