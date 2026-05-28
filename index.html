@@ -1321,8 +1321,8 @@ async function getVPSTokenBalance(ldAddr, token) {
 async function loadLDTokenBalances() {
   // Use selected account address — device or node
   let ldAddr;
-  if (selectedAccount && selectedAccount.type === 'node') {
-    // Node — use node's LD address derived from its PUF
+  const isNode = selectedAccount && selectedAccount.type === 'node';
+  if (isNode) {
     ldAddr = 'LD-' + (selectedAccount.puf || selectedAccount.id.replace('LD',''));
   } else {
     ldAddr = 'LD-' + S.devicePuf;
@@ -1330,14 +1330,16 @@ async function loadLDTokenBalances() {
   if (!ldAddr || ldAddr === 'LD-') return;
 
   try {
-    const onChain = await getTokenBalance(TOKEN_CONTRACTS.USDT.contract, ldAddr);
-    const offChain = await getVPSTokenBalance(ldAddr, 'USDT');
-    document.getElementById('chipUsdtAmt').textContent = (onChain + offChain).toFixed(2);
+    // For nodes: only VPS balance (Spectral Ledger)
+    // For devices: VPS + on-chain (they can have both)
+    const offChainUSDT = await getVPSTokenBalance(ldAddr, 'USDT');
+    const onChainUSDT = isNode ? 0 : await getTokenBalance(TOKEN_CONTRACTS.USDT.contract, ldAddr);
+    document.getElementById('chipUsdtAmt').textContent = (onChainUSDT + offChainUSDT).toFixed(2);
   } catch(e) { document.getElementById('chipUsdtAmt').textContent = '0.00'; }
   try {
-    const onChain = await getTokenBalance(TOKEN_CONTRACTS.USDC.contract, ldAddr);
-    const offChain = await getVPSTokenBalance(ldAddr, 'USDC');
-    document.getElementById('chipUsdcAmt').textContent = (onChain + offChain).toFixed(2);
+    const offChainUSDC = await getVPSTokenBalance(ldAddr, 'USDC');
+    const onChainUSDC = isNode ? 0 : await getTokenBalance(TOKEN_CONTRACTS.USDC.contract, ldAddr);
+    document.getElementById('chipUsdcAmt').textContent = (onChainUSDC + offChainUSDC).toFixed(2);
   } catch(e) { document.getElementById('chipUsdcAmt').textContent = '0.00'; }
 }
 
@@ -2415,13 +2417,13 @@ async function transferOwnership(nodeId) {
 
 // ── TOKENS ──
 const TOKEN_CONTRACTS = {
-  PYCO: { contract: '0xABFc535DD9A85Bd6BA61192210623fEfADD912A1', symbol: 'PYCO', color: '#00bfff', decimals: 6 },
-  USDT: { contract: '0x2A30BFb63c65EC7BAE244B4f49e05904483C877c', symbol: 'USDT', color: '#26a17b', decimals: 6 },
-  USDC: { contract: '0x20f409b8B8b8E517b24ab00C3A0027e286f392fB', symbol: 'USDC', color: '#2775ca', decimals: 6 },
+  PYCO: { contract: '0x16a69CcdA3865a23537d46055dC6564A2813C36B', symbol: 'PYCO', color: '#00bfff', decimals: 6 },
+  USDT: { contract: '0x7e0f53f04dDc48dFdc96DFE93606a73f0dCF56A3', symbol: 'USDT', color: '#26a17b', decimals: 6 },
+  USDC: { contract: '0x1AfC80b30cBBE50E8aBb4585f53ff530c305d416', symbol: 'USDC', color: '#2775ca', decimals: 6 },
   BOBL: { contract: null, symbol: 'BOBL', color: '#f5a623', decimals: 6 },
 };
 
-const RPC_URL = 'https://sepolia-rollup.arbitrum.io/rpc';
+const RPC_URL = 'https://arb1.arbitrum.io/rpc';
 
 // ── DEVICE SIGNING (WebCrypto P-256) ──
 const DEVICE_KEY_NAME = 'lindblad_device_p256';
@@ -2584,17 +2586,17 @@ function selectPortfolioToken(token) {
 // ── BRIDGE ──
 const BRIDGE_CONTRACTS = {
   USDT: {
-    contract: '0x2A30BFb63c65EC7BAE244B4f49e05904483C877c',
-    token: '0xF9105b8f19E9B474eAe96053Ab35DaC4d8957cef',
+    contract: '0x7e0f53f04dDc48dFdc96DFE93606a73f0dCF56A3',
+    token: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
     symbol: 'USDT'
   },
   USDC: {
-    contract: '0x20f409b8B8b8E517b24ab00C3A0027e286f392fB',
-    token: '0x7426074516DC17Ed6dDf607eAdD8631132f74626',
+    contract: '0x1AfC80b30cBBE50E8aBb4585f53ff530c305d416',
+    token: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
     symbol: 'USDC'
   }
 };
-const PYCO_CONTRACT = '0xABFc535DD9A85Bd6BA61192210623fEfADD912A1';
+const PYCO_CONTRACT = '0x16a69CcdA3865a23537d46055dC6564A2813C36B';
 let selectedBridgeToken = 'USDT';
 
 function selectBridgeToken(token) {
@@ -2637,11 +2639,15 @@ function selectBridgeToken(token) {
 
 async function loadBridgeBalances() {
   const cfg = BRIDGE_CONTRACTS[selectedBridgeToken];
-  const ldAddr = 'LD-' + S.devicePuf;
+  // Use selected account address
+  const isNode = selectedAccount && selectedAccount.type === 'node';
+  const ldAddr = isNode
+    ? 'LD-' + (selectedAccount.puf || selectedAccount.id.replace('LD',''))
+    : 'LD-' + S.devicePuf;
   try {
-    // Load Lindblad balance (in contract)
-    const onChain = await getTokenBalance(cfg.contract, ldAddr);
+    // For nodes: only VPS balance; for devices: VPS + on-chain
     const offChain = await getVPSTokenBalance(ldAddr, selectedBridgeToken);
+    const onChain = isNode ? 0 : await getTokenBalance(cfg.contract, ldAddr);
     const total = onChain + offChain;
     document.getElementById('bridgeContractBal').textContent = total.toFixed(2);
     document.getElementById('withdrawAvailable').childNodes[0].textContent = total.toFixed(2) + ' ';
@@ -2882,16 +2888,16 @@ async function bridgeDeposit() {
     const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
     const account = accounts[0];
 
-    // Check network — Arbitrum Sepolia = 0x66eee (421614)
+    // Check network — Arbitrum One = 0xa4b1 (421614)
     const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-    if (chainId !== '0x66eee') {
-      msg.innerHTML = 'Switch to Arbitrum Sepolia in MetaMask';
+    if (chainId !== '0xa4b1') {
+      msg.innerHTML = 'Switch to Arbitrum One in MetaMask';
       msg.style.color = 'var(--red,#f87171)';
       // Try to switch
       try {
         await window.ethereum.request({
           method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0x66eee' }]
+          params: [{ chainId: '0xa4b1' }]
         });
       } catch(e) {}
       return;
@@ -3028,10 +3034,10 @@ async function bridgeWithdraw() {
   const withdrawAccount = withdrawAccounts[0];
 
   const withdrawChainId = await window.ethereum.request({ method: 'eth_chainId' });
-  if (withdrawChainId !== '0x66eee') {
-    msg.textContent = 'Switch to Arbitrum Sepolia in MetaMask';
+  if (withdrawChainId !== '0xa4b1') {
+    msg.textContent = 'Switch to Arbitrum One in MetaMask';
     msg.style.color = 'var(--red,#f87171)';
-    try { await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x66eee' }] }); } catch(e) {}
+    try { await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0xa4b1' }] }); } catch(e) {}
     return;
   }
 
