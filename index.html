@@ -1330,16 +1330,14 @@ async function loadLDTokenBalances() {
   if (!ldAddr || ldAddr === 'LD-') return;
 
   try {
-    // For nodes: only VPS balance (Spectral Ledger)
-    // For devices: VPS + on-chain (they can have both)
+    // Always use VPS balance (Spectral Ledger) — deposited USDT is credited there
+    // On-chain balance is what's still in MetaMask, not what's in the Spectral Ledger
     const offChainUSDT = await getVPSTokenBalance(ldAddr, 'USDT');
-    const onChainUSDT = isNode ? 0 : await getTokenBalance(TOKEN_CONTRACTS.USDT.contract, ldAddr);
-    document.getElementById('chipUsdtAmt').textContent = (onChainUSDT + offChainUSDT).toFixed(2);
+    document.getElementById('chipUsdtAmt').textContent = offChainUSDT.toFixed(2);
   } catch(e) { document.getElementById('chipUsdtAmt').textContent = '0.00'; }
   try {
     const offChainUSDC = await getVPSTokenBalance(ldAddr, 'USDC');
-    const onChainUSDC = isNode ? 0 : await getTokenBalance(TOKEN_CONTRACTS.USDC.contract, ldAddr);
-    document.getElementById('chipUsdcAmt').textContent = (onChainUSDC + offChainUSDC).toFixed(2);
+    document.getElementById('chipUsdcAmt').textContent = offChainUSDC.toFixed(2);
   } catch(e) { document.getElementById('chipUsdcAmt').textContent = '0.00'; }
 }
 
@@ -1424,13 +1422,14 @@ function updateWalletView() {
   const balance = found ? found.bal / 1e6 : (node.bal ? node.bal / 1e6 : 0);
 
   document.getElementById('mainBalanceNum').textContent = fmtFull(balance); document.getElementById('mainBalanceSym').textContent = ' PYCO'; S.ldBalance = balance;
-  const nodeShortId = node.id.startsWith('LD') ? node.id : ('LD' + (node.puf||'').slice(0,7).toUpperCase());
+  const nodeShortId = 'LD' + (node.puf||'').slice(0,7).toUpperCase();
+  const nodeFullAddr = 'LD-' + (node.puf||'').toUpperCase();
   lbl.innerHTML = '';
   const nodeSpan = document.createElement('span');
   nodeSpan.style.cssText = 'cursor:pointer;color:var(--neon);font-family:var(--mono);font-size:12px;letter-spacing:1px';
-  nodeSpan.title = 'Copy node ID';
+  nodeSpan.title = 'Copy node address';
   nodeSpan.textContent = nodeShortId + ' ⎘';
-  nodeSpan.onclick = () => navigator.clipboard.writeText(nodeShortId).then(() => toast('Copied!','ok'));
+  nodeSpan.onclick = () => navigator.clipboard.writeText(nodeFullAddr).then(() => toast('Copied: ' + nodeShortId,'ok'));
   lbl.appendChild(nodeSpan);
   pycoAmt.textContent = fmtFull(balance);
   btn.disabled = false;  // Send available for all users
@@ -2305,9 +2304,14 @@ async function getMyLDBalance() {
 }
 
 function copyAddress() {
-  // Copy full LD- address for sending
-  const fullAddr = 'LD-' + (S.devicePuf || '').toUpperCase();
-  const shortId = 'LD' + (S.devicePuf || '').slice(0,7).toUpperCase();
+  // Always copy full LD- format for transfers
+  const fullAddr = S.connectedNode
+    ? 'LD-' + (S.connectedNode.puf || '').toUpperCase()
+    : 'LD-' + (S.devicePuf || '').toUpperCase();
+  const shortId = S.connectedNode
+    ? 'LD' + (S.connectedNode.puf || '').slice(0,7).toUpperCase()
+    : 'LD' + (S.devicePuf || '').slice(0,7).toUpperCase();
+  if (!fullAddr || fullAddr === 'LD-') return;
   navigator.clipboard.writeText(fullAddr).then(() => {
     toast('Copied: ' + shortId, 'ok');
   }).catch(() => {
@@ -2645,10 +2649,8 @@ async function loadBridgeBalances() {
     ? 'LD-' + (selectedAccount.puf || selectedAccount.id.replace('LD',''))
     : 'LD-' + S.devicePuf;
   try {
-    // For nodes: only VPS balance; for devices: VPS + on-chain
-    const offChain = await getVPSTokenBalance(ldAddr, selectedBridgeToken);
-    const onChain = isNode ? 0 : await getTokenBalance(cfg.contract, ldAddr);
-    const total = onChain + offChain;
+    // Always use VPS balance — deposited funds live in Spectral Ledger
+    const total = await getVPSTokenBalance(ldAddr, selectedBridgeToken);
     document.getElementById('bridgeContractBal').textContent = total.toFixed(2);
     document.getElementById('withdrawAvailable').childNodes[0].textContent = total.toFixed(2) + ' ';
     document.getElementById('withdrawAvailableSym').textContent = selectedBridgeToken;
@@ -2941,7 +2943,7 @@ async function bridgeDeposit() {
     const strLen = strBytes.length;
     const strHex = Array.from(strBytes).map(b => b.toString(16).padStart(2,'0')).join('');
     const strPadded = strHex.padEnd(Math.ceil(strLen/32)*64, '0');
-    const depositData = "0x8e27d719" +
+    const depositData = "0xb1ff6cd8" +
       "0000000000000000000000000000000000000000000000000000000000000040" +
       amtBig.toString(16).padStart(64,"0") +
       strLen.toString(16).padStart(64,"0") +
