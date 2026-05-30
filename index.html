@@ -619,6 +619,19 @@ body {
         <span class="amt" id="pycoAmt">—</span>
         <span>PYCO</span>
       </div>
+
+      <!-- Network dropdown -->
+      <div style="position:relative;display:inline-block">
+        <div onclick="toggleNetworkDropdown()" style="display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:8px;border:1px solid rgba(0,191,255,0.25);background:rgba(0,191,255,0.05);cursor:pointer;font-family:var(--mono);font-size:10px;color:var(--neon)">
+          <span id="networkDropdownLabel">Arbitrum</span>
+          <span style="font-size:8px">▼</span>
+        </div>
+        <div id="networkDropdownMenu" style="display:none;position:absolute;top:110%;left:0;z-index:200;background:var(--bg2);border:1px solid rgba(0,191,255,0.2);border-radius:8px;min-width:140px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.4)">
+          <div onclick="selectBalanceNetwork('arbitrum')" id="net-opt-arbitrum" style="padding:10px 14px;font-family:var(--mono);font-size:11px;cursor:pointer;color:var(--neon);background:rgba(0,191,255,0.06)">✓ Arbitrum One</div>
+          <div onclick="selectBalanceNetwork('polygon')" id="net-opt-polygon" style="padding:10px 14px;font-family:var(--mono);font-size:11px;cursor:pointer;color:var(--muted)">Polygon</div>
+        </div>
+      </div>
+
       <div class="asset-chip" onclick="selectAsset('USDT')" id="chip-usdt" style="cursor:pointer">
         <span>₮</span>
         <span id="chipUsdtAmt" class="amt">—</span>
@@ -629,9 +642,7 @@ body {
         <span id="chipUsdcAmt" class="amt">—</span>
         <span>USDC</span>
       </div>
-
     </div>
-  </div>
 
   <!-- CONNECT NODE -->
   <div class="connect-panel">
@@ -780,6 +791,18 @@ body {
       </div>
     </div>
 
+    <!-- Network selector in tokens tab -->
+    <div style="position:relative;display:inline-block;margin-bottom:10px" id="tokensNetworkWrap">
+      <div onclick="toggleTokensNetworkDropdown()" style="display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;border:1px solid rgba(0,191,255,0.25);background:rgba(0,191,255,0.05);cursor:pointer;font-family:var(--mono);font-size:10px;color:var(--neon)">
+        <span id="tokensNetworkLabel">Arbitrum One</span>
+        <span style="font-size:8px">▼</span>
+      </div>
+      <div id="tokensNetworkMenu" style="display:none;position:absolute;top:110%;left:0;z-index:200;background:var(--bg2);border:1px solid rgba(0,191,255,0.2);border-radius:8px;min-width:150px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.4)">
+        <div onclick="selectTokensNetwork('arbitrum')" id="tok-net-arb" style="padding:10px 14px;font-family:var(--mono);font-size:11px;cursor:pointer;color:var(--neon);background:rgba(0,191,255,0.06)">✓ Arbitrum One</div>
+        <div onclick="selectTokensNetwork('polygon')" id="tok-net-pol" style="padding:10px 14px;font-family:var(--mono);font-size:11px;cursor:pointer;color:var(--muted)">Polygon</div>
+      </div>
+    </div>
+
     <!-- USDT -->
     <div onclick="selectPortfolioToken('USDT')" id="token-card-USDT" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;cursor:pointer">
       <div style="display:flex;align-items:center;gap:12px">
@@ -820,8 +843,17 @@ body {
   <!-- BRIDGE TAB -->
   <div id="view-bridge" style="display:none;padding:0 16px 100px">
 
+    <!-- Network selector -->
+    <div style="margin:16px 0 8px">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:6px">Network</div>
+      <div style="display:flex;gap:8px">
+        <button onclick="selectBridgeNetwork('arbitrum')" id="btn-net-arbitrum" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--neon);background:rgba(0,191,255,0.1);color:var(--neon);font-family:var(--mono);font-size:11px;font-weight:700;cursor:pointer">Arbitrum One</button>
+        <button onclick="selectBridgeNetwork('polygon')" id="btn-net-polygon" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--muted2);font-family:var(--mono);font-size:11px;font-weight:700;cursor:pointer">Polygon</button>
+      </div>
+    </div>
+
     <!-- Token selector -->
-    <div style="display:flex;gap:8px;margin:16px 0 12px">
+    <div style="display:flex;gap:8px;margin:8px 0 12px">
       <button onclick="selectBridgeToken('USDT')" id="btn-usdt" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--neon);background:rgba(0,191,255,0.1);color:var(--neon);font-family:var(--mono);font-size:13px;font-weight:700;cursor:pointer">USDT</button>
       <button onclick="selectBridgeToken('USDC')" id="btn-usdc" style="flex:1;padding:10px;border-radius:10px;border:1px solid var(--border2);background:var(--bg3);color:var(--muted2);font-family:var(--mono);font-size:13px;font-weight:700;cursor:pointer">USDC</button>
     </div>
@@ -1310,9 +1342,9 @@ function selectAsset(asset) {
   }
 }
 
-async function getVPSTokenBalance(ldAddr, token) {
+async function getVPSTokenBalance(ldAddr, token, network='arbitrum') {
   try {
-    const res = await fetch(`${VPS}/token-balance/${ldAddr}?token=${token}`);
+    const res = await fetch(`${VPS}/token-balance/${ldAddr}?token=${token}&network=${network}`);
     const data = await res.json();
     return (data.balance || 0) / 1e6;
   } catch(e) { return 0; }
@@ -1329,14 +1361,13 @@ async function loadLDTokenBalances() {
   }
   if (!ldAddr || ldAddr === 'LD-') return;
 
+  const balNet = selectedBalanceNetwork || 'arbitrum';
   try {
-    // Always use VPS balance (Spectral Ledger) — deposited USDT is credited there
-    // On-chain balance is what's still in MetaMask, not what's in the Spectral Ledger
-    const offChainUSDT = await getVPSTokenBalance(ldAddr, 'USDT');
+    const offChainUSDT = await getVPSTokenBalance(ldAddr, 'USDT', balNet);
     document.getElementById('chipUsdtAmt').textContent = offChainUSDT.toFixed(2);
   } catch(e) { document.getElementById('chipUsdtAmt').textContent = '0.00'; }
   try {
-    const offChainUSDC = await getVPSTokenBalance(ldAddr, 'USDC');
+    const offChainUSDC = await getVPSTokenBalance(ldAddr, 'USDC', balNet);
     document.getElementById('chipUsdcAmt').textContent = offChainUSDC.toFixed(2);
   } catch(e) { document.getElementById('chipUsdcAmt').textContent = '0.00'; }
 }
@@ -2541,15 +2572,16 @@ async function loadTokenBalances() {
   }
   document.getElementById('total-pyco').textContent = totalPyco.toFixed(2);
 
-  // Load USDT balance
+  // Load USDT/USDC from Spectral Ledger VPS for selected network
+  const tokNet = selectedTokensNetwork || 'arbitrum';
   try {
-    const usdtBal = await getTokenBalance(TOKEN_CONTRACTS.USDT.contract, ldAddr);
+    const usdtBal = await getVPSTokenBalance(ldAddr, 'USDT', tokNet);
     document.getElementById('total-usdt').textContent = usdtBal.toFixed(2);
   } catch(e) { document.getElementById('total-usdt').textContent = '0.00'; }
 
   // Load USDC balance
   try {
-    const usdcBal = await getTokenBalance(TOKEN_CONTRACTS.USDC.contract, ldAddr);
+    const usdcBal = await getVPSTokenBalance(ldAddr, 'USDC', tokNet);
     document.getElementById('total-usdc').textContent = usdcBal.toFixed(2);
   } catch(e) { document.getElementById('total-usdc').textContent = '0.00'; }
 }
@@ -2588,6 +2620,106 @@ function selectPortfolioToken(token) {
 }
 
 // ── BRIDGE ──
+// Multi-chain network config
+const NETWORKS = {
+  arbitrum: {
+    name: 'Arbitrum One',
+    chainId: '0xa4b1',
+    chainIdDec: 42161,
+    contracts: {
+      USDT: '0x7e0f53f04dDc48dFdc96DFE93606a73f0dCF56A3',
+      USDC: '0x1AfC80b30cBBE50E8aBb4585f53ff530c305d416',
+    },
+    tokens: {
+      USDT: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
+      USDC: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+    },
+    rpcName: 'Arbitrum One',
+    explorerName: 'Arbiscan'
+  },
+  polygon: {
+    name: 'Polygon',
+    chainId: '0x89',
+    chainIdDec: 137,
+    contracts: {
+      USDT: '0x5E850eFe2843AD0699D6153F03859a5C761ae125',
+      USDC: '0xcd690504a5ca7fe44CF1aF3A692fF2FFd828EFcC',
+    },
+    tokens: {
+      USDT: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F',
+      USDC: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
+    },
+    rpcName: 'Polygon Mainnet',
+    explorerName: 'Polygonscan'
+  }
+};
+
+let selectedBridgeNetwork = 'arbitrum';
+let selectedBalanceNetwork = 'arbitrum';
+
+function selectBridgeNetwork(network) {
+  selectedBridgeNetwork = network;
+  // Update UI
+  document.getElementById('btn-net-arbitrum').style.cssText = network === 'arbitrum'
+    ? 'flex:1;padding:8px;border-radius:8px;border:1px solid var(--neon);background:rgba(0,191,255,0.1);color:var(--neon);font-family:var(--mono);font-size:11px;font-weight:700;cursor:pointer'
+    : 'flex:1;padding:8px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--muted2);font-family:var(--mono);font-size:11px;font-weight:700;cursor:pointer';
+  document.getElementById('btn-net-polygon').style.cssText = network === 'polygon'
+    ? 'flex:1;padding:8px;border-radius:8px;border:1px solid var(--neon);background:rgba(0,191,255,0.1);color:var(--neon);font-family:var(--mono);font-size:11px;font-weight:700;cursor:pointer'
+    : 'flex:1;padding:8px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--muted2);font-family:var(--mono);font-size:11px;font-weight:700;cursor:pointer';
+  loadBridgeBalances();
+}
+
+function toggleNetworkDropdown() {
+  const menu = document.getElementById('networkDropdownMenu');
+  if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+function selectBalanceNetwork(network) {
+  selectedBalanceNetwork = network;
+  const label = document.getElementById('networkDropdownLabel');
+  if (label) label.textContent = network === 'arbitrum' ? 'Arbitrum' : 'Polygon';
+  // Update dropdown options
+  const arb = document.getElementById('net-opt-arbitrum');
+  const pol = document.getElementById('net-opt-polygon');
+  if (arb) { arb.style.color = network === 'arbitrum' ? 'var(--neon)' : 'var(--muted)'; arb.style.background = network === 'arbitrum' ? 'rgba(0,191,255,0.06)' : 'transparent'; arb.textContent = (network === 'arbitrum' ? '✓ ' : '') + 'Arbitrum One'; }
+  if (pol) { pol.style.color = network === 'polygon' ? 'var(--neon)' : 'var(--muted)'; pol.style.background = network === 'polygon' ? 'rgba(0,191,255,0.06)' : 'transparent'; pol.textContent = (network === 'polygon' ? '✓ ' : '') + 'Polygon'; }
+  // Close dropdown
+  const menu = document.getElementById('networkDropdownMenu');
+  if (menu) menu.style.display = 'none';
+  // Reload balances
+  loadLDTokenBalances();
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('networkDropdownMenu');
+  if (wrap && !e.target.closest('#networkDropdownWrap') && !e.target.closest('[onclick="toggleNetworkDropdown()"]')) {
+    wrap.style.display = 'none';
+  }
+});
+
+function cycleBalanceNetwork() { toggleNetworkDropdown(); }
+
+let selectedTokensNetwork = 'arbitrum';
+
+function toggleTokensNetworkDropdown() {
+  const menu = document.getElementById('tokensNetworkMenu');
+  if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+function selectTokensNetwork(network) {
+  selectedTokensNetwork = network;
+  const label = document.getElementById('tokensNetworkLabel');
+  if (label) label.textContent = network === 'arbitrum' ? 'Arbitrum One' : 'Polygon';
+  const arb = document.getElementById('tok-net-arb');
+  const pol = document.getElementById('tok-net-pol');
+  if (arb) { arb.style.color = network === 'arbitrum' ? 'var(--neon)' : 'var(--muted)'; arb.style.background = network === 'arbitrum' ? 'rgba(0,191,255,0.06)' : 'transparent'; arb.textContent = (network === 'arbitrum' ? '✓ ' : '') + 'Arbitrum One'; }
+  if (pol) { pol.style.color = network === 'polygon' ? 'var(--neon)' : 'var(--muted)'; pol.style.background = network === 'polygon' ? 'rgba(0,191,255,0.06)' : 'transparent'; pol.textContent = (network === 'polygon' ? '✓ ' : '') + 'Polygon'; }
+  const menu = document.getElementById('tokensNetworkMenu');
+  if (menu) menu.style.display = 'none';
+  loadTokenBalances();
+}
+
 const BRIDGE_CONTRACTS = {
   USDT: {
     contract: '0x7e0f53f04dDc48dFdc96DFE93606a73f0dCF56A3',
@@ -2642,7 +2774,8 @@ function selectBridgeToken(token) {
 }
 
 async function loadBridgeBalances() {
-  const cfg = BRIDGE_CONTRACTS[selectedBridgeToken];
+  const netCfg = NETWORKS[selectedBridgeNetwork];
+  const cfg = { contract: netCfg.contracts[selectedBridgeToken], token: netCfg.tokens[selectedBridgeToken] };
   // Use selected account address
   const isNode = selectedAccount && selectedAccount.type === 'node';
   const ldAddr = isNode
@@ -2880,7 +3013,11 @@ async function bridgeDeposit() {
   if (!amt || amt <= 0) { msg.textContent = 'Enter amount'; msg.style.color = 'var(--red,#f87171)'; return; }
   if (!window.ethereum) { msg.textContent = 'MetaMask not found'; msg.style.color = 'var(--red,#f87171)'; return; }
 
-  const cfg = BRIDGE_CONTRACTS[selectedBridgeToken];
+  const netCfg = NETWORKS[selectedBridgeNetwork];
+  const cfg = {
+    contract: netCfg.contracts[selectedBridgeToken],
+    token: netCfg.tokens[selectedBridgeToken]
+  };
   const amtRaw = Math.round(amt * 1e6).toString(16).padStart(64, '0');
 
   try {
@@ -2892,14 +3029,14 @@ async function bridgeDeposit() {
 
     // Check network — Arbitrum One = 0xa4b1 (421614)
     const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-    if (chainId !== '0xa4b1') {
+    if (chainId !== NETWORKS[selectedBridgeNetwork].chainId) {
       msg.innerHTML = 'Switch to Arbitrum One in MetaMask';
       msg.style.color = 'var(--red,#f87171)';
       // Try to switch
       try {
         await window.ethereum.request({
           method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0xa4b1' }]
+          params: [{ chainId: NETWORKS[selectedBridgeNetwork].chainId }]
         });
       } catch(e) {}
       return;
@@ -3039,7 +3176,7 @@ async function bridgeWithdraw() {
   if (withdrawChainId !== '0xa4b1') {
     msg.textContent = 'Switch to Arbitrum One in MetaMask';
     msg.style.color = 'var(--red,#f87171)';
-    try { await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0xa4b1' }] }); } catch(e) {}
+    try { await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: NETWORKS[selectedBridgeNetwork].chainId }] }); } catch(e) {}
     return;
   }
 
