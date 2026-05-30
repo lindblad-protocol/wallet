@@ -3039,7 +3039,8 @@ async function bridgeDeposit() {
     // Check network — Arbitrum One = 0xa4b1 (421614)
     const chainId = await window.ethereum.request({ method: 'eth_chainId' });
     if (chainId !== NETWORKS[selectedBridgeNetwork].chainId) {
-      msg.innerHTML = 'Switch to Arbitrum One in MetaMask';
+      const netName = selectedBridgeNetwork === 'polygon' ? 'Polygon' : 'Arbitrum One';
+      msg.innerHTML = 'Switch to ' + netName + ' in MetaMask';
       msg.style.color = 'var(--red,#f87171)';
       // Try to switch
       try {
@@ -3182,8 +3183,9 @@ async function bridgeWithdraw() {
   const withdrawAccount = withdrawAccounts[0];
 
   const withdrawChainId = await window.ethereum.request({ method: 'eth_chainId' });
-  if (withdrawChainId !== '0xa4b1') {
-    msg.textContent = 'Switch to Arbitrum One in MetaMask';
+  if (withdrawChainId !== NETWORKS[selectedBridgeNetwork].chainId) {
+    const netName = selectedBridgeNetwork === 'polygon' ? 'Polygon' : 'Arbitrum One';
+    msg.textContent = 'Switch to ' + netName + ' in MetaMask';
     msg.style.color = 'var(--red,#f87171)';
     try { await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: NETWORKS[selectedBridgeNetwork].chainId }] }); } catch(e) {}
     return;
