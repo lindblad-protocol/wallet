@@ -211,10 +211,15 @@ body {
 
 .wallet-assets {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 10px;
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid var(--border2);
+}
+.wallet-assets-chips {
+  display: flex;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -614,13 +619,8 @@ body {
     <div class="wallet-node" id="myNodeLabel">Connect a node to see your balance</div>
 
     <div class="wallet-assets">
-      <div class="asset-chip active" onclick="selectAsset('PYCO')" id="chip-pyco" style="cursor:pointer">
-        <span>⬡</span>
-        <span class="amt" id="pycoAmt">—</span>
-        <span>PYCO</span>
-      </div>
 
-      <!-- Network dropdown -->
+      <!-- Network selector row -->
       <div style="position:relative;display:inline-block">
         <div onclick="toggleNetworkDropdown()" style="display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:8px;border:1px solid rgba(0,191,255,0.25);background:rgba(0,191,255,0.05);cursor:pointer;font-family:var(--mono);font-size:10px;color:var(--neon)">
           <span id="networkDropdownLabel">Arbitrum</span>
@@ -632,16 +632,25 @@ body {
         </div>
       </div>
 
-      <div class="asset-chip" onclick="selectAsset('USDT')" id="chip-usdt" style="cursor:pointer">
-        <span>₮</span>
-        <span id="chipUsdtAmt" class="amt">—</span>
-        <span>USDT</span>
+      <!-- Chips row -->
+      <div class="wallet-assets-chips">
+        <div class="asset-chip active" onclick="selectAsset('PYCO')" id="chip-pyco" style="cursor:pointer">
+          <span>⬡</span>
+          <span class="amt" id="pycoAmt">—</span>
+          <span>PYCO</span>
+        </div>
+        <div class="asset-chip" onclick="selectAsset('USDT')" id="chip-usdt" style="cursor:pointer">
+          <span>₮</span>
+          <span id="chipUsdtAmt" class="amt">—</span>
+          <span>USDT</span>
+        </div>
+        <div class="asset-chip" onclick="selectAsset('USDC')" id="chip-usdc" style="cursor:pointer">
+          <span>◎</span>
+          <span id="chipUsdcAmt" class="amt">—</span>
+          <span>USDC</span>
+        </div>
       </div>
-      <div class="asset-chip" onclick="selectAsset('USDC')" id="chip-usdc" style="cursor:pointer">
-        <span>◎</span>
-        <span id="chipUsdcAmt" class="amt">—</span>
-        <span>USDC</span>
-      </div>
+
     </div>
 
   <!-- CONNECT NODE -->
