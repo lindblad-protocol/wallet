@@ -3075,9 +3075,9 @@ async function bridgeDeposit() {
 
     msg.textContent = 'Step 1/2: Waiting for approval...';
 
-    // Wait for approval — poll receipt
+    // Wait for approval — poll receipt and verify success
     let receipt = null;
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 40; i++) {
       await new Promise(r => setTimeout(r, 2000));
       receipt = await window.ethereum.request({
         method: 'eth_getTransactionReceipt',
@@ -3085,6 +3085,15 @@ async function bridgeDeposit() {
       });
       if (receipt) break;
     }
+
+    if (!receipt || receipt.status === '0x0') {
+      msg.textContent = 'Approval failed or timed out. Try again.';
+      msg.style.color = 'var(--red,#f87171)';
+      return;
+    }
+
+    // Extra wait to ensure allowance is visible on-chain
+    await new Promise(r => setTimeout(r, 2000));
 
     msg.textContent = 'Step 2/2: Depositing...';
 
@@ -3102,7 +3111,7 @@ async function bridgeDeposit() {
 
     const depositTx = await window.ethereum.request({
       method: 'eth_sendTransaction',
-      params: [{ from: account, to: cfg.contract, data: depositData, gas: '0x493e0' }]
+      params: [{ from: account, to: cfg.contract, data: depositData, gasLimit: '0x493e0' }]
     });
 
     msg.innerHTML = `✅ Depositing... TX: ${depositTx.slice(0,10)}...<br>
