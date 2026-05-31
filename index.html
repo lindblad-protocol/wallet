@@ -889,7 +889,10 @@ body {
       <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:6px">From <span id="depositNetLabel">Arbitrum</span> wallet → Lindblad LD- account</div>
       <input id="depositAmt" type="number" placeholder="Amount (USDT)" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:var(--mono);font-size:14px;outline:none;margin-bottom:10px;box-sizing:border-box">
       <input id="depositLindAddr" placeholder="LD- address (recipient)" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;margin-bottom:10px;box-sizing:border-box">
-      <button onclick="bridgeDeposit()" style="width:100%;padding:12px;border-radius:10px;background:linear-gradient(135deg,#0066cc,#0099ff);border:none;color:#fff;font-family:var(--mono);font-size:13px;font-weight:700;cursor:pointer">Deposit via MetaMask</button>
+      <div style="display:flex;gap:8px;margin-bottom:6px">
+        <button id="btnApprove" onclick="bridgeApprove()" style="flex:1;padding:12px;border-radius:10px;background:linear-gradient(135deg,#005599,#0077cc);border:none;color:#fff;font-family:var(--mono);font-size:12px;font-weight:700;cursor:pointer">Step 1: Approve</button>
+        <button id="btnDeposit" onclick="bridgeDepositOnly()" style="flex:1;padding:12px;border-radius:10px;background:linear-gradient(135deg,#006633,#00aa55);border:none;color:#fff;font-family:var(--mono);font-size:12px;font-weight:700;cursor:pointer">Step 2: Deposit</button>
+      </div>
       <div id="depositMsg" style="font-family:var(--mono);font-size:11px;margin-top:8px;min-height:16px"></div>
     </div>
 
@@ -3018,6 +3021,115 @@ async function fillMyWallet() {
   } catch(e) {}
 }
 
+async function bridgeApprove() {
+  const msg = document.getElementById('depositMsg');
+  const amt = parseFloat(document.getElementById('depositAmt').value);
+  if (!amt || amt <= 0) { msg.textContent = 'Enter amount first'; msg.style.color = 'var(--red,#f87171)'; return; }
+  if (!window.ethereum) { msg.textContent = 'MetaMask not found'; msg.style.color = 'var(--red,#f87171)'; return; }
+
+  const netCfg = NETWORKS[selectedBridgeNetwork];
+  const cfg = { contract: netCfg.contracts[selectedBridgeToken], token: netCfg.tokens[selectedBridgeToken] };
+
+  try {
+    msg.textContent = 'Connecting...'; msg.style.color = 'var(--muted2)';
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    const account = accounts[0];
+    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+    if (chainId.toLowerCase() !== netCfg.chainId.toLowerCase()) {
+      msg.textContent = 'Switch to ' + (selectedBridgeNetwork === 'polygon' ? 'Polygon' : 'Arbitrum One') + ' in MetaMask';
+      msg.style.color = 'var(--red,#f87171)';
+      try { await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: netCfg.chainId }] }); } catch(e) {}
+      return;
+    }
+
+    msg.textContent = 'Approving... confirm in MetaMask';
+    const approveData = "0x095ea7b3" +
+      cfg.contract.slice(2).toLowerCase().padStart(64, "0") +
+      BigInt(Math.round(amt * 1e6)).toString(16).padStart(64, "0");
+
+    const approveTx = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: account, to: cfg.token, data: approveData, gas: '0x186a0' }]
+    });
+
+    msg.textContent = '⏳ Waiting for approval confirmation...';
+    msg.style.color = 'var(--muted2)';
+
+    let receipt = null;
+    for (let i = 0; i < 40; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      receipt = await window.ethereum.request({ method: 'eth_getTransactionReceipt', params: [approveTx] });
+      if (receipt) break;
+    }
+
+    if (!receipt || receipt.status === '0x0') {
+      msg.textContent = 'Approval failed. Try again.'; msg.style.color = 'var(--red,#f87171)'; return;
+    }
+
+    msg.textContent = '✅ Approved! Now click Step 2: Deposit';
+    msg.style.color = 'var(--green)';
+    document.getElementById('btnDeposit').style.background = 'linear-gradient(135deg,#007744,#00cc66)';
+    document.getElementById('btnDeposit').style.boxShadow = '0 0 12px rgba(0,200,100,0.4)';
+
+  } catch(e) {
+    msg.textContent = e.message || 'Cancelled'; msg.style.color = 'var(--red,#f87171)';
+  }
+}
+
+async function bridgeDepositOnly() {
+  const msg = document.getElementById('depositMsg');
+  const amt = parseFloat(document.getElementById('depositAmt').value);
+  const lindAddr = document.getElementById('depositLindAddr').value.trim() || ('LD-' + S.devicePuf);
+  if (!amt || amt <= 0) { msg.textContent = 'Enter amount first'; msg.style.color = 'var(--red,#f87171)'; return; }
+  if (!window.ethereum) { msg.textContent = 'MetaMask not found'; msg.style.color = 'var(--red,#f87171)'; return; }
+
+  const netCfg = NETWORKS[selectedBridgeNetwork];
+  const cfg = { contract: netCfg.contracts[selectedBridgeToken], token: netCfg.tokens[selectedBridgeToken] };
+
+  try {
+    msg.textContent = 'Sending deposit... confirm in MetaMask'; msg.style.color = 'var(--muted2)';
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    const account = accounts[0];
+    const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+    if (chainId.toLowerCase() !== netCfg.chainId.toLowerCase()) {
+      msg.textContent = 'Switch to ' + (selectedBridgeNetwork === 'polygon' ? 'Polygon' : 'Arbitrum One') + ' in MetaMask';
+      msg.style.color = 'var(--red,#f87171)';
+      try { await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: netCfg.chainId }] }); } catch(e) {}
+      return;
+    }
+
+    const amtBig = BigInt(Math.round(amt * 1e6));
+    const strBytes = new TextEncoder().encode(lindAddr);
+    const strLen = strBytes.length;
+    const strHex = Array.from(strBytes).map(b => b.toString(16).padStart(2,'0')).join('');
+    const strPadded = strHex.padEnd(Math.ceil(strLen/32)*64, '0');
+    const depositSelector = selectedBridgeToken === 'USDC' ? '0x8e27d719' : '0xb1ff6cd8';
+    const depositData = depositSelector +
+      "0000000000000000000000000000000000000000000000000000000000000040" +
+      amtBig.toString(16).padStart(64,"0") +
+      strLen.toString(16).padStart(64,"0") +
+      strPadded;
+
+    const currentGasPrice = await window.ethereum.request({ method: 'eth_gasPrice' });
+    const depositGasPriceHex = '0x' + (parseInt(currentGasPrice, 16) * 2).toString(16);
+
+    const depositTx = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: account, to: cfg.contract, data: depositData, gas: '0x493e0', gasPrice: depositGasPriceHex }]
+    });
+
+    msg.innerHTML = `✅ Deposit sent! TX: ${depositTx.slice(0,10)}...<br><span style="color:var(--neon)">${amt} ${selectedBridgeToken} → ${lindAddr}</span>`;
+    msg.style.color = 'var(--green)';
+    toast(`Depositing ${amt} ${selectedBridgeToken}`, 'ok');
+    document.getElementById('btnDeposit').style.background = 'linear-gradient(135deg,#006633,#00aa55)';
+    document.getElementById('btnDeposit').style.boxShadow = 'none';
+    setTimeout(loadBridgeBalances, 5000);
+
+  } catch(e) {
+    msg.textContent = e.message || 'Cancelled'; msg.style.color = 'var(--red,#f87171)';
+  }
+}
+
 async function bridgeDeposit() {
   const msg = document.getElementById('depositMsg');
   const amt = parseFloat(document.getElementById('depositAmt').value);
@@ -3109,9 +3221,19 @@ async function bridgeDeposit() {
       strLen.toString(16).padStart(64,"0") +
       strPadded;
 
+    // Get current gas price for Polygon
+    const currentGasPrice = await window.ethereum.request({ method: 'eth_gasPrice' });
+    const gasPriceHex = '0x' + (parseInt(currentGasPrice, 16) * 2).toString(16);
+
     const depositTx = await window.ethereum.request({
       method: 'eth_sendTransaction',
-      params: [{ from: account, to: cfg.contract, data: depositData, gasLimit: '0x493e0' }]
+      params: [{ 
+        from: account, 
+        to: cfg.contract, 
+        data: depositData, 
+        gas: '0x493e0',
+        gasPrice: gasPriceHex
+      }]
     });
 
     msg.innerHTML = `✅ Depositing... TX: ${depositTx.slice(0,10)}...<br>
