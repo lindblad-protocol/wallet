@@ -1000,7 +1000,7 @@ body {
 <script>
 // ── CONFIG ──
 const VPS = '';  // relative — same origin
-const REFRESH_SEC = 10;
+const REFRESH_SEC = 30;
 
 let S = {
   chain: null,
@@ -1269,9 +1269,16 @@ async function refresh() {
     populateKnownNodes();
     resetProg();
     document.getElementById('netLabel').textContent = 'LIVE';
+    S._lastRefreshOk = true;
   } catch(e) {
-    document.getElementById('netLabel').textContent = 'OFFLINE';
-    toast('Connection error', 'err');
+    // Don't clear UI on error — keep showing last known values
+    // Only show offline if we've never loaded successfully
+    if (!S._lastRefreshOk) {
+      document.getElementById('netLabel').textContent = 'OFFLINE';
+    } else {
+      document.getElementById('netLabel').textContent = 'LIVE~';
+    }
+    // Silent retry — no toast on routine refresh errors
   }
 }
 
@@ -1376,11 +1383,11 @@ async function loadLDTokenBalances() {
   try {
     const offChainUSDT = await getVPSTokenBalance(ldAddr, 'USDT', balNet);
     document.getElementById('chipUsdtAmt').textContent = offChainUSDT.toFixed(2);
-  } catch(e) { document.getElementById('chipUsdtAmt').textContent = '0.00'; }
+  } catch(e) { /* keep existing value */ }
   try {
     const offChainUSDC = await getVPSTokenBalance(ldAddr, 'USDC', balNet);
     document.getElementById('chipUsdcAmt').textContent = offChainUSDC.toFixed(2);
-  } catch(e) { document.getElementById('chipUsdcAmt').textContent = '0.00'; }
+  } catch(e) { /* keep existing value */ }
 }
 
 async function loadLDBalance() {
