@@ -1369,8 +1369,9 @@ async function getVPSTokenBalance(ldAddr, token, network='arbitrum') {
 }
 
 async function loadLDTokenBalances() {
-  // Use selected account address — device or node
-  let ldAddr;
+  if (_loadingTokens) return;
+  _loadingTokens = true;
+  try {
   const isNode = selectedAccount && selectedAccount.type === 'node';
   if (isNode) {
     ldAddr = 'LD-' + (selectedAccount.puf || selectedAccount.id.replace('LD',''));
@@ -1388,25 +1389,29 @@ async function loadLDTokenBalances() {
     const offChainUSDC = await getVPSTokenBalance(ldAddr, 'USDC', balNet);
     document.getElementById('chipUsdcAmt').textContent = offChainUSDC.toFixed(2);
   } catch(e) { /* keep existing value */ }
+  } finally {
+    _loadingTokens = false;
+  }
 }
 
 async function loadLDBalance() {
-  const bal = document.getElementById('myBal');
+  if (_loadingBalance) return;
+  _loadingBalance = true;
+
   const lbl = document.getElementById('myNodeLabel');
   const pycoAmt = document.getElementById('pycoAmt');
 
   if (!S.devicePuf) {
-    document.getElementById('mainBalanceNum').textContent = '—'; document.getElementById('mainBalanceSym').textContent = ' PYCO';
-    lbl.textContent = 'Connect a node or use your LD address';
+    if (lbl) lbl.textContent = 'Connect a node or use your LD address';
+    _loadingBalance = false;
     return;
   }
 
-  const ldAddr = 'LD-' + S.devicePuf;
-  document.getElementById('mainBalanceNum').textContent = '...';
-  lbl.textContent = ldAddr;
+  const ldAddr = 'LD-' + S.devicePuf.toUpperCase();
+  const fullLbl = '<span style="cursor:pointer;color:var(--neon);font-family:var(--mono);font-size:12px;letter-spacing:1px" onclick="copyAddress()" title="Tap to copy">' + ldAddr + ' ⎘</span>';
+  if (lbl && !lbl.innerHTML.includes(ldAddr)) lbl.innerHTML = fullLbl;
 
   try {
-    // Get PYCO from ext_token_balances (includes migrated balance)
     const [accRes, pycoRes] = await Promise.all([
       fetch(`${VPS}/account/${ldAddr}`),
       fetch(`${VPS}/token-balance/${ldAddr}?token=PYCO`)
@@ -1414,7 +1419,6 @@ async function loadLDBalance() {
     const accData = await accRes.json();
     const pycoData = await pycoRes.json();
 
-    // Use ext_token_balances PYCO if available, else fall back to ledger balance
     let pycoBalance = 0;
     if (pycoData.balance !== undefined) {
       pycoBalance = pycoData.balance / 1e6;
@@ -1427,13 +1431,13 @@ async function loadLDBalance() {
       document.getElementById('mainBalanceNum').textContent = pycoBalance.toFixed(4);
       document.getElementById('mainBalanceSym').textContent = ' PYCO';
     }
-    pycoAmt.textContent = pycoBalance.toFixed(4);
-    const shortAddr = 'LD' + S.devicePuf.slice(0,7).toUpperCase();
-    lbl.innerHTML = '<span style="cursor:pointer;color:var(--neon);font-family:var(--mono);font-size:12px;letter-spacing:1px" onclick="copyAddress()" title="Tap to copy">' + shortAddr + ' (ready) ⎘</span>';
+    if (pycoAmt) pycoAmt.textContent = pycoBalance.toFixed(4);
+    if (lbl) lbl.innerHTML = fullLbl;
   } catch(e) {
-    document.getElementById('mainBalanceNum').textContent = '—'; document.getElementById('mainBalanceSym').textContent = ' PYCO';
-    const shortAddr2 = 'LD' + S.devicePuf.slice(0,7).toUpperCase();
-    lbl.textContent = shortAddr2 + ' (offline)';
+    // Keep existing values on error
+    if (lbl && !lbl.innerHTML.includes(ldAddr)) lbl.innerHTML = fullLbl;
+  } finally {
+    _loadingBalance = false;
   }
 }
 
@@ -1908,8 +1912,18 @@ async function renderActivityTab() {
 // ── REFRESH ──
 function doRefresh() { refresh(); toast('Refreshed', 'ok'); }
 
+// Debounce flags to prevent request storms
+let _refreshing = false;
+let _loadingBalance = false;
+let _loadingTokens = false;
+
 function startRefresh() {
-  setInterval(refresh, REFRESH_SEC * 1000);
+  setInterval(async () => {
+    if (_refreshing) return; // skip if already refreshing
+    _refreshing = true;
+    await refresh();
+    _refreshing = false;
+  }, REFRESH_SEC * 1000);
 }
 
 function resetProg() {
@@ -2064,8 +2078,8 @@ async function selectAccount(idx) {
     // Update label to show device ID
     const lbl2 = document.getElementById('myNodeLabel');
     if (lbl2 && S.devicePuf) {
-      const shortAddr = 'LD' + S.devicePuf.slice(0,7).toUpperCase();
-      lbl2.innerHTML = '<span style="cursor:pointer;color:var(--neon);font-family:var(--mono);font-size:12px;letter-spacing:1px" onclick="copyAddress()" title="Tap to copy">' + shortAddr + ' (ready) ⎘</span>';
+      const fullAddr2 = 'LD-' + S.devicePuf.toUpperCase();
+      lbl2.innerHTML = '<span style="cursor:pointer;color:var(--neon);font-family:var(--mono);font-size:12px;letter-spacing:1px" onclick="copyAddress()" title="Tap to copy">' + fullAddr2 + ' ⎘</span>';
     }
     toast('Using: MY DEVICE', 'ok');
   }
