@@ -890,8 +890,7 @@ body {
       <input id="depositAmt" type="number" placeholder="Amount (USDT)" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:var(--mono);font-size:14px;outline:none;margin-bottom:10px;box-sizing:border-box">
       <input id="depositLindAddr" placeholder="LD- address (recipient)" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;margin-bottom:10px;box-sizing:border-box">
       <div style="display:flex;gap:8px;margin-bottom:6px">
-        <button id="btnApprove" onclick="bridgeApprove()" style="flex:1;padding:12px;border-radius:10px;background:linear-gradient(135deg,#005599,#0077cc);border:none;color:#fff;font-family:var(--mono);font-size:12px;font-weight:700;cursor:pointer">Step 1: Approve</button>
-        <button id="btnDeposit" onclick="bridgeDepositOnly()" style="flex:1;padding:12px;border-radius:10px;background:linear-gradient(135deg,#006633,#00aa55);border:none;color:#fff;font-family:var(--mono);font-size:12px;font-weight:700;cursor:pointer">Step 2: Deposit</button>
+        <button onclick="bridgeDeposit()" style="width:100%;padding:12px;border-radius:10px;background:linear-gradient(135deg,#0066cc,#0099ff);border:none;color:#fff;font-family:var(--mono);font-size:13px;font-weight:700;cursor:pointer">Deposit via MetaMask</button>
       </div>
       <div id="depositMsg" style="font-family:var(--mono);font-size:11px;margin-top:8px;min-height:16px"></div>
     </div>
@@ -1472,7 +1471,7 @@ function updateWalletView() {
   nodeSpan.style.cssText = 'cursor:pointer;color:var(--neon);font-family:var(--mono);font-size:12px;letter-spacing:1px';
   nodeSpan.title = 'Copy node address';
   nodeSpan.textContent = nodeShortId + ' ⎘';
-  nodeSpan.onclick = () => navigator.clipboard.writeText(nodeFullAddr).then(() => toast('Copied: ' + nodeShortId,'ok'));
+  nodeSpan.onclick = () => navigator.clipboard.writeText(nodeFullAddr).then(() => toast('Copied: ' + nodeFullAddr,'ok'));
   lbl.appendChild(nodeSpan);
   pycoAmt.textContent = fmtFull(balance);
   btn.disabled = false;  // Send available for all users
@@ -2356,7 +2355,22 @@ function copyAddress() {
     : 'LD' + (S.devicePuf || '').slice(0,7).toUpperCase();
   if (!fullAddr || fullAddr === 'LD-') return;
   navigator.clipboard.writeText(fullAddr).then(() => {
-    toast('Copied: ' + shortId, 'ok');
+    toast('Copied: ' + fullAddr, 'ok');
+  }).catch(() => {
+    const el = document.createElement('textarea');
+    el.value = fullAddr; document.body.appendChild(el);
+    el.select(); document.execCommand('copy');
+    document.body.removeChild(el);
+    toast('Copied!', 'ok');
+  });
+}
+
+function copyReceiveId() {
+  // Copy the full LD- address of the device (not the node)
+  const fullAddr = 'LD-' + (S.devicePuf || '').toUpperCase();
+  if (!fullAddr || fullAddr === 'LD-') { toast('No address found', 'err'); return; }
+  navigator.clipboard.writeText(fullAddr).then(() => {
+    toast('Copied: ' + fullAddr, 'ok');
   }).catch(() => {
     const el = document.createElement('textarea');
     el.value = fullAddr; document.body.appendChild(el);
@@ -3215,15 +3229,15 @@ async function bridgeDeposit() {
     const strLen = strBytes.length;
     const strHex = Array.from(strBytes).map(b => b.toString(16).padStart(2,'0')).join('');
     const strPadded = strHex.padEnd(Math.ceil(strLen/32)*64, '0');
-    const depositData = "0xb1ff6cd8" +
+    const depositData = "0x8e27d719" +
       "0000000000000000000000000000000000000000000000000000000000000040" +
       amtBig.toString(16).padStart(64,"0") +
       strLen.toString(16).padStart(64,"0") +
       strPadded;
 
-    // Get current gas price for Polygon
+    // Get current gas price
     const currentGasPrice = await window.ethereum.request({ method: 'eth_gasPrice' });
-    const gasPriceHex = '0x' + (parseInt(currentGasPrice, 16) * 2).toString(16);
+    const depositGasPriceHex = '0x' + (parseInt(currentGasPrice, 16) * 2).toString(16);
 
     const depositTx = await window.ethereum.request({
       method: 'eth_sendTransaction',
@@ -3232,14 +3246,19 @@ async function bridgeDeposit() {
         to: cfg.contract, 
         data: depositData, 
         gas: '0x493e0',
-        gasPrice: gasPriceHex
+        gasPrice: depositGasPriceHex
       }]
     });
 
-    msg.innerHTML = `✅ Depositing... TX: ${depositTx.slice(0,10)}...<br>
+    msg.innerHTML = `✅ Deposit sent! TX: ${depositTx.slice(0,10)}...<br>
       <span style="color:var(--neon)">${amt} ${selectedBridgeToken} → ${lindAddr}</span>`;
+    msg.style.color = 'var(--green)';
     toast(`Depositing ${amt} ${selectedBridgeToken}`, 'ok');
-    
+
+    // Clear fields
+    document.getElementById('depositAmt').value = '';
+    document.getElementById('depositLindAddr').value = '';
+
     // Refresh balances after 5s
     setTimeout(loadBridgeBalances, 5000);
 
