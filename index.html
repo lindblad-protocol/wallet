@@ -636,17 +636,17 @@ body {
       <div class="wallet-assets-chips">
         <div class="asset-chip active" onclick="selectAsset('PYCO')" id="chip-pyco" style="cursor:pointer">
           <span>⬡</span>
-          <span class="amt" id="pycoAmt">—</span>
+          <span class="amt" id="pycoAmt">0.0000</span>
           <span>PYCO</span>
         </div>
         <div class="asset-chip" onclick="selectAsset('USDT')" id="chip-usdt" style="cursor:pointer">
           <span>₮</span>
-          <span id="chipUsdtAmt" class="amt">—</span>
+          <span id="chipUsdtAmt" class="amt">0.00</span>
           <span>USDT</span>
         </div>
         <div class="asset-chip" onclick="selectAsset('USDC')" id="chip-usdc" style="cursor:pointer">
           <span>◎</span>
-          <span id="chipUsdcAmt" class="amt">—</span>
+          <span id="chipUsdcAmt" class="amt">0.00</span>
           <span>USDC</span>
         </div>
       </div>
@@ -1464,7 +1464,7 @@ function updateWalletView() {
   if (!node) {
     loadLDBalance();
   setTimeout(loadLDTokenBalances, 1000);
-    pycoAmt.textContent = '—';
+    
     btn.disabled = false;
     banner.classList.add('show');
     return;
