@@ -1201,6 +1201,53 @@ async function init() {
   initDeviceKey();
   setTimeout(loadLDTokenBalances, 500);
 
+  // ── AUTO-REGISTER NODE FROM CAPTIVE PORTAL ──
+  // When node redirects to wallet?node=LDXXXXXX&puf=XXXXXXXX
+  // auto-pair so user sees it in My Accounts immediately
+  const urlParams = new URLSearchParams(window.location.search);
+  const autoNode = urlParams.get('node');
+  const autoPuf  = urlParams.get('puf');
+  if (autoNode && autoPuf) {
+    // Clean URL without reloading
+    window.history.replaceState({}, document.title, '/wallet');
+    // Wait for node to come online (it just restarted)
+    toast('Node detected — pairing automatically...', 'ok');
+    setTimeout(async () => {
+      try {
+        // Auto-pair: register this device as authorized for the node
+        const res = await fetch(`${VPS}/auto-pair`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nodeId: autoNode,
+            nodePuf: autoPuf,
+            devicePuf: S.devicePuf
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          toast(`${autoNode} registered!`, 'ok');
+          await loadMyAccounts();
+          // Show pairing code panel automatically
+          document.getElementById('showPairingPanel').style.display = 'block';
+          const display = document.getElementById('pairingCodeDisplay');
+          const expiry  = document.getElementById('pairingCodeExpiry');
+          display.textContent = data.code || '——';
+          expiry.textContent  = data.code
+            ? 'Use this code to register on other devices'
+            : 'Tap "Generate New Code" to create a pairing code';
+          expiry.style.color = data.code ? 'var(--neon)' : 'orange';
+          // Scroll to My Accounts
+          document.getElementById('myAccountsList')?.scrollIntoView({ behavior: 'smooth' });
+        } else {
+          toast('Auto-pair failed — use pairing code manually', 'err');
+        }
+      } catch(e) {
+        toast('Node not online yet — try pairing manually', 'err');
+      }
+    }, 5000); // wait 5s for node to reconnect after restart
+  }
+
 }
 
 
@@ -2993,7 +3040,10 @@ async function sendToken() {
   const msg = document.getElementById('sendTokenMsg');
   const amt = parseFloat(document.getElementById('sendTokenAmt').value);
   const toAddr = document.getElementById('sendTokenTo').value.trim().toUpperCase();
-  const ldAddr = 'LD-' + S.devicePuf.toUpperCase();  // full format for API
+  
+  // Use node PUF if a node is selected, otherwise device PUF
+  const activePuf = S.connectedNode ? S.connectedNode.puf : S.devicePuf;
+  const ldAddr = 'LD-' + activePuf.toUpperCase();
   const token = selectedBridgeToken;
 
   if (!amt || amt <= 0) { msg.textContent = 'Enter amount'; msg.style.color = 'var(--red,#f87171)'; return; }
@@ -3647,14 +3697,13 @@ async function generatePairingCode() {
 }
 
 function showPairingCode() {
-  // Only show pairing code generator on authorized devices
+  // Find any node account (type node) or the recently auto-paired node
   const node = (myAccounts || []).find(a => a.type === 'node');
-  if (!node) { toast('No node connected', 'err'); return; }
+  if (!node) { toast('No node found in My Accounts', 'err'); return; }
 
   const panel = document.getElementById('showPairingPanel');
   panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
   if (panel.style.display === 'block') {
-    // Fetch from VPS directly (no local network needed)
     const display = document.getElementById('pairingCodeDisplay');
     const expiry = document.getElementById('pairingCodeExpiry');
     display.textContent = '...';
@@ -3663,8 +3712,7 @@ function showPairingCode() {
     fetch(`${VPS}/pairing-code?nodeId=${node.id}`)
       .then(r => r.json())
       .then(data => {
-        if (data.error) {
-          // No code on VPS — need to generate from node
+        if (data.error || !data.code) {
           display.textContent = '——';
           expiry.textContent = 'Tap "Generate New Code" to create one';
           expiry.style.color = 'orange';
